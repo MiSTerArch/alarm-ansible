@@ -1,0 +1,15 @@
+# Static information about the filesystems.
+# See fstab(5) for details.
+
+# <file system> <dir> <type> <options> <dump> <pass>
+
+# Originally generated with `genfstab -L`
+
+# /dev/mmcblk0p3
+LABEL=misterarch_fs   /       btrfs rw,relatime,ssd,space_cache=v2,subvol=/root,discard=async      0 0
+
+# /dev/mmcblk0p1
+LABEL=misterboot      /boot   vfat  rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro    0 2
+
+# /dev/mmcblk0p3
+LABEL=misterarch_fs   /mnt/fs btrfs rw,relatime,ssd,space_cache=v2,subvol=/,discard=async      0 0

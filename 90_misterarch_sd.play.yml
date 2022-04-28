@@ -1,0 +1,145 @@
+- name: MiSTerArch onto SD
+  hosts: localhost
+  vars:
+    ansible_become: yes
+    chroot_dir: '{{playbook_dir}}/build/chroot'
+    sd_img: '{{playbook_dir}}/build/MiSTerArch.img'
+    sd_root: '{{playbook_dir}}/build/sd/root'
+  tags: misterarch, misterarch_sd
+
+  tasks:
+    - name: Make sure things are unmounted
+      ansible.builtin.shell:
+        chdir: '{{playbook_dir}}/build'
+        cmd: |
+          umount -R sd
+          umount -R sd/root/boot
+
+          # always successful no matter what
+          exit 0
+
+    - name: Allocate img.sd file
+      ansible.builtin.shell: |
+        dd if=/dev/zero of={{ sd_img }} bs=1M count=2500
+
+    - name: Create /boot partition
+      community.general.parted:
+        device: '{{ sd_img }}'
+        number: 1
+        fs_type: fat32
+        part_end: 200MB
+        state: present
+
+    - name: Create uboot preloader partition
+      community.general.parted:
+        device: '{{ sd_img }}'
+        number: 2
+        part_start: 200MB
+        part_end: 203MB
+        state: present
+
+    - name: Create rootfs partition
+      community.general.parted:
+        device: '{{ sd_img }}'
+        number: 3
+        fs_type: btrfs
+        part_start: 203MB
+        state: present
+
+    - name: losetup
+      ansible.builtin.shell: |
+        losetup -fP --show {{ sd_img }}
+      register: losetup
+
+    - name: Set uboot preloader partition type to 'a2'
+      ansible.builtin.shell: |
+        printf 't\n2\na2\nw\n' | fdisk {{losetup.stdout}}
+        partprobe {{losetup.stdout}}
+      tags: uboot
+
+    - name: dd uboot preloader onto sd card partition
+      ansible.builtin.shell: |
+        dd if={{ chroot_dir }}/boot/uboot.img of={{losetup.stdout}}p2
+      tags: uboot
+
+    - name: Format /boot filesystem
+      community.general.filesystem:
+        dev: '{{losetup.stdout}}p1'
+        fstype: vfat
+        opts: -F 32 -n misterboot # label has to be under 11 characters
+        state: present
+
+    - name: Format rootfs filesystem
+      community.general.filesystem:
+        dev: '{{losetup.stdout}}p3'
+        fstype: btrfs
+        opts: -L misterarch_fs
+        state: present
+
+    - name: Create fs dir structure and mount everything in its proper spot
+      ansible.builtin.shell:
+        chdir: '{{playbook_dir}}/build'
+        warn: false # silence mkdir warning
+                    # mount module would work better too, but that's also
+                    # unsuitable without touching the local /etc/fstab
+        cmd: |
+          mkdir -p sd &&
+          mount {{losetup.stdout}}p3 -o subvol=/ sd &&
+          btrfs subvolume create sd/root &&
+          btrfs subvolume set-default sd/root &&
+          mkdir -p sd/root/mnt/fs &&
+          mkdir -p sd/root/boot &&
+          mount {{losetup.stdout}}p1 sd/root/boot
+
+    - name: Cleanup chroot source before copying
+      # Less stuff to copy
+      ansible.builtin.shell:
+        chdir: '{{playbook_dir}}/build'
+        cmd: |
+          umount -R chroot
+          rm -Rf chroot/var/cache/pacman/pkg/*
+          rm -Rf chroot/home/*/.cache/*
+        removes: chroot/var/cache/pacman/pkg/*
+      tags: cleanup
+
+    - name: Rsync rootfs from chroot to sd card
+      ansible.builtin.shell:
+        chdir: '{{playbook_dir}}/build'
+        cmd: |
+          rsync --archive --hard-links --acls --xattrs --sparse -recursive chroot/* sd/root/
+          sync
+      tags: copy
+
+    - name: Remove temporary pacman-key database to preserve user security
+      ansible.builtin.file:
+        path: '{{sd_root}}/etc/pacman.d/gnupg/'
+        state: absent
+      tags: cleanup
+
+    - name: Unmount partitions
+      ansible.builtin.shell:
+        chdir: '{{playbook_dir}}/build'
+        cmd: |
+          umount -R sd/root/boot
+          umount -R sd
+      tags: cleanup
+
+    - name: Cleanup losetup
+      ansible.builtin.shell: |
+        losetup -d {{losetup.stdout}}
+      tags: cleanup
+
+    - name: Compress image
+      community.general.archive:
+        path: '{{ sd_img }}'
+        dest: '{{ sd_img }}.tar.gz'
+        format: gz
+        force_archive: yes
+      tags: compress
+
+    - name: Checksum of the image
+      ansible.builtin.shell:
+        chdir: '{{playbook_dir}}/build'
+        cmd: |
+            sha256sum MiSTerArch.img.tar.gz > MiSTerArch.img.tar.gz.sha256
+      tags: checksum

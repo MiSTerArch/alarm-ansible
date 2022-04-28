@@ -1,0 +1,62 @@
+- name: MiSTerArchify the install
+  hosts: archlinuxarm
+  vars:
+    ansible_become: yes
+  tags: misterarch
+
+  tasks:
+    - name: Add MiSTerArch pacman repos
+      ansible.builtin.replace:
+        path: /etc/pacman.conf
+        regexp: '(mirrorlist)\s+(# An example .*)\n'
+        replace: |
+            \1
+
+            [misterarch]
+            SigLevel = Optional TrustedOnly
+            Server = http://misterarch.hypertriangle.com/repo
+
+            \2
+      tags: install, repo
+
+    - name: Install MiSTerArch packages
+      community.general.pacman:
+        update_cache: yes
+        package:
+          - uboot-mister
+          - linux-mister
+          - mister-bin
+          - mister-menu
+      tags: install
+
+    - name: Enable and start MiSTer.service
+      ansible.builtin.systemd:
+        name: MiSTer
+        enabled: yes
+      tags: provision
+
+    - name: Install /etc/fstab
+      ansible.builtin.copy:
+        src: '{{playbook_dir}}/fstab'
+        dest: '/etc/fstab'
+      tags: provision
+
+    - name: Create Scripts/
+      ansible.builtin.file:
+        path: '/media/fat/Scripts/'
+        state: directory
+      tags: provision, finish_misterarch_install
+
+    - name: Copy finish_misterarch_install.sh
+      ansible.builtin.copy:
+        src: '{{playbook_dir}}/finish_misterarch_install.sh'
+        dest: '/media/fat/Scripts/finish_misterarch_install.sh'
+        mode: +x
+      tags: provision, finish_misterarch_install
+
+    - name: Spam finish_misterarch_install.sh in homedir too
+      ansible.builtin.file:
+        src: '/media/fat/Scripts/finish_misterarch_install.sh'
+        dest: '/home/{{username}}/finish_misterarch_install.sh'
+        state: link
+      tags: provision, finish_misterarch_install
