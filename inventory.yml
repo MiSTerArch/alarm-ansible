@@ -1,10 +1,7 @@
-# Copy this file and pass it with -i to ansible-playbook
-# or append it to /etc/ansible/hosts
-
 archlinuxarm: # hosts targeted by alarm-ansible
   vars:
     username: alarm
-    hostname: your_alarm_hostname
+    hostname: MiSTerArch
 
   hosts:
     # 'archlinuxarm-chroot:' host is dynamically added at the end of first playbook
