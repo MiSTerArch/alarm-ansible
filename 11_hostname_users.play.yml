@@ -12,24 +12,8 @@
         line: '{{hostname}}'
       tags: hostname
 
-    - name: Create main user
+    - name: Add user to groups
       ansible.builtin.user:
         user: '{{username}}'
-        groups: wheel, uucp, video
-      tags: user
-
-    - name: Install authorized_key from localhost
-      ansible.posix.authorized_key:
-        user: '{{username}}'
-        key: "{{ lookup('file', ssh_key_pub) }}"
-        state: present
-      register: authorized_keys
-      tags: user
-
-    - name: Remove the alarm default user
-      when: authorized_keys['state'] == 'present'
-      ansible.builtin.user:
-        name: alarm
-        state: absent
-        remove: yes
+        groups: wheel, uucp
       tags: user

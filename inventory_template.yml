@@ -3,23 +3,8 @@
 
 archlinuxarm: # hosts targeted by alarm-ansible
   vars:
-    username: your_alarm_username
+    username: alarm
     hostname: your_alarm_hostname
-
-    host_username: your_host_username
-    ssh_key:     '/home/{{host_username}}/.ssh/id_rsa'
-    ssh_key_pub: '{{ssh_key}}.pub'
-    ansible_ssh_private_key_file: '{{ssh_key}}'
 
   hosts:
     # 'archlinuxarm-chroot:' host is dynamically added at the end of first playbook
-
-    # In theory this project can be used without any inventory in this section
-    # but if you want to provision over ssh you can do it by uncommenting
-    # the following
-
-    # yoursshhost:
-      #ansible_host: yoursshhost.lan
-      #ansible_user: alarm     # halfway through you need to restart the playbooks with the proper {{username}} instead of alarm
-      #ansible_ssh_pass: alarm # then delete this line, since ssh keys will be installed
-      #ansible_python_interpreter: '/usr/bin/python'
