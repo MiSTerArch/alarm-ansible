@@ -79,6 +79,19 @@
           regexp: '^#ParallelDownloads'
           line: 'ParallelDownloads = 5'
 
+    - name: Remove generic kernel
+      # we probably aren't using it anyway, so let's skip the mkinitcpio
+      # time for every update action until we replace it with our kernel.
+      community.general.pacman:
+        package:
+          - linux-armv7
+          - linux-aarch64
+          - mkinitcpio
+          - mkinitcpio-busybox
+        state: absent
+        extra_args: --cascade
+      tags: install, kernel
+
     - name: Update packages
       community.general.pacman:
         update_cache: yes
